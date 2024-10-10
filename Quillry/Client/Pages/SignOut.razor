@@ -1,0 +1,16 @@
+﻿
+@page "/signout"
+
+@using Quillry.Client.Services
+
+@inject IServiceScopeFactory _serviceScopeFactory
+@inject NavigationManager _navManager
+@inject AuthStateProvider _authStateProvider
+
+@code {
+    protected override async Task OnInitializedAsync()
+    {
+        await _authStateProvider.SignOut();
+        _navManager.NavigateTo("/");
+    }
+}

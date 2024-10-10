@@ -1,0 +1,97 @@
+﻿﻿@using System.Text.Json
+@using Quillry.Client.Helpers
+@using Quillry.Client.Services
+
+@inject IServiceScopeFactory _serviceScopeFactory
+@inject ILogger<UserLoginGrid> _logger
+@inject NotificationService _notificationService
+@inject AuthenticationStateProvider _authStateProvider
+
+<RadzenDataGrid @ref=@_gridRef
+                Data=@_gridData
+                TItem="UserLoginDto"
+                AllowFiltering=true
+                AllowSorting=true
+                AllowColumnResize=true
+                AllowPaging=true
+                AllowColumnPicking=true
+                AllowColumnReorder=true
+                ShowPagingSummary=true
+                AllowGrouping=false
+                FilterMode="FilterMode.Advanced"
+                PageSize="10"
+                Density="Density.Compact"
+                PagerHorizontalAlign="HorizontalAlign.Center"
+                ColumnWidth="150px"
+                LogicalFilterOperator="LogicalFilterOperator.Or"
+                FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
+                SelectionMode="DataGridSelectionMode.Single"
+                ExpandMode="DataGridExpandMode.Single"
+                IsLoading=@_isLoading
+                Responsive=true>
+    <Columns>
+        <RadzenDataGridColumn TItem="UserLoginDto" Title="User" Property="DisplayName" TextAlign="TextAlign.Left" Visible=@(string.IsNullOrEmpty(UserId)) />
+        <RadzenDataGridColumn TItem="UserLoginDto" Title="IP" Property="IPAddress" TextAlign="TextAlign.Left" />
+        <RadzenDataGridColumn TItem="UserLoginDto" Title="Info" Property="UserAgentInfo" TextAlign="TextAlign.Left" />
+        <RadzenDataGridColumn TItem="UserLoginDto" Title="Logged In On" Property="LoggedInOn" TextAlign="TextAlign.Left" />
+    </Columns>
+</RadzenDataGrid>
+
+@code {
+    [Parameter] public string? UserId { get; set; }
+
+    List<UserLoginDto> _gridData { get; set; } = new();
+    bool _isLoading { get; set; }
+    RadzenDataGrid<UserLoginDto> _gridRef;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await base.OnInitializedAsync();
+        await GetGridDataAsync();
+    }
+
+    async Task GetGridDataAsync()
+    {
+        if (_isLoading) return;
+        try
+        {
+            _isLoading = true;
+            using var scope = _serviceScopeFactory.CreateAsyncScope();
+            HttpService httpService = scope.ServiceProvider.GetRequiredService<HttpService>();
+
+            ApiResponse apiResponse = new();
+
+            if (string.IsNullOrEmpty(UserId))
+            {
+                apiResponse = await httpService.Get($"userlogins");
+            }
+            else
+            {
+                apiResponse = await httpService.Get($"userlogins?userId={UserId}");
+            }
+
+            if (apiResponse.Success)
+            {
+                _gridData = JsonSerializer.Deserialize<List<UserLoginDto>>(apiResponse.Data, new JsonSerializerOptions
+                    {
+                        PropertyNameCaseInsensitive = true
+                    });
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+        catch (Exception ex)
+        {
+            _notificationService.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Error,
+                    Detail = $"{ex.Message}"
+                });
+
+            _logger.LogError(ex.Message);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+}

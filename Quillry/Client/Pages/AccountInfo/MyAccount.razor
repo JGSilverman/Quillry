@@ -1,0 +1,104 @@
+﻿@page "/myaccount"
+
+@using System.Text.Json
+@using Quillry.Client.Helpers
+@using Quillry.Client.Services
+@using Quillry.Shared
+
+
+@attribute [Authorize]
+
+@inject IServiceScopeFactory _serviceScopeFactory
+@inject ILogger<MyAccount> _logger
+@inject NotificationService _notificationService
+@inject AuthenticationStateProvider _authStateProvider
+
+@if (_isLoading)
+{
+    <div>Loading...</div>
+}
+else
+{
+    @if (_userAccount is not null)
+    {
+        <div class="container-fluid">
+            <RadzenCard>
+                <RadzenText class="d-block text-center" TextStyle="TextStyle.H4" Text=@_userAccount.DisplayName />
+                <RadzenText class="d-block text-center" TextStyle="TextStyle.H6" Text=@_userAccount.Email />
+                <RadzenText class="d-block text-center" TextStyle="TextStyle.Subtitle1" Text=@string.Format("Member since {0}", @_userAccount.JoinedOn.ToString()) />
+            </RadzenCard>
+        </div>
+
+        <div class="mt-5 container-fluid">
+            <div class="row">
+                <div class="col-lg-4 col-sm-12 mt-1">
+                    <RadzenCard class="text-center">
+                        <RadzenText TextStyle="TextStyle.H4" Text="Security Info" />
+                        <RadzenText TextStyle="TextStyle.Subtitle1" Text="Keep your security info up to date." />
+                        <RadzenLink Path="/myaccount/security" Text="Review and Update Security Settings" />
+                    </RadzenCard>
+                </div>
+               @*  <div class="col-lg-4 col-sm-12 mt-1">
+                    <RadzenCard class="text-center">
+                        <RadzenText TextStyle="TextStyle.H4" Text="Settings & Privacy" />
+                        <RadzenText TextStyle="TextStyle.Subtitle1" Text="Personalize your account settings and see how your data is used." />
+                        <RadzenLink Path="/account/notification-settings" Text="Personalize your account settings" />
+                    </RadzenCard>
+                </div> *@
+                <div class="col-lg-4 col-sm-12 mt-1">
+                    <RadzenCard class="text-center">
+                        <RadzenText TextStyle="TextStyle.H4" Text="My sign-ins" />
+                        <RadzenText TextStyle="TextStyle.Subtitle1" Text="See when and where you’ve signed in and check if anything looks unusual." />
+                        <RadzenLink Path="/myaccount/signins" Text="View My Recent Activity" />
+                    </RadzenCard>
+                </div>
+            </div>
+        </div>
+    }
+}
+
+@code {
+    UserAccountDto _userAccount { get; set; }
+    bool _isLoading { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await base.OnInitializedAsync();
+        await GetDataAsync();
+    }
+
+    async Task GetDataAsync()
+    {
+        if (_isLoading) return;
+        try
+        {
+            _isLoading = true;
+            using var scope = _serviceScopeFactory.CreateAsyncScope();
+            HttpService httpService = scope.ServiceProvider.GetRequiredService<HttpService>();
+
+            ApiResponse apiResponse = await httpService.Get($"account");
+            if (apiResponse.Success)
+            {
+                _userAccount = JsonSerializer.Deserialize<UserAccountDto>(apiResponse.Data, new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                });
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+        catch (Exception ex)
+        {
+            _notificationService.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Error,
+                    Detail = $"{ex.Message}"
+                });
+
+            _logger.LogError(ex.Message);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+}

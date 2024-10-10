@@ -1,0 +1,122 @@
+﻿@inherits LayoutComponentBase
+@inject NavigationManager _navManager
+@inject IJSRuntime _js
+
+<RadzenComponents/>
+
+@if (!_isMobileView)
+{
+    <RadzenHeader>
+    <div class="px-5 py-2">
+        <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent=JustifyContent.SpaceBetween AlignItems="AlignItems.Center" Gap="0">
+            <div>
+                <RadzenButton id="homeBtn"
+                              ButtonStyle="ButtonStyle.Light"
+                              Variant="Variant.Text"
+                              Click="@(() => NavTo("/"))"
+                              Text="MyApp" />
+            </div>
+
+            <AuthorizeView>
+                <NotAuthorized>
+                    <RadzenMenu>
+                        <RadzenMenuItem Click=@(() => NavTo("/signup")) Text="Sign Up" />
+                        <RadzenMenuItem Click=@(() => NavTo("/signin")) Text="Sign In" />
+                    </RadzenMenu>
+                </NotAuthorized>
+                <Authorized>
+                    <div class="px-5">
+                        <RadzenMenu>
+                            <RadzenMenuItem Text=@context.User.Identity.Name>
+                                <RadzenMenuItem Click=@(() => NavTo("/myaccount")) Text="Account" Icon="account_circle" />
+                                <AuthorizeView Roles="Admin">
+                                    <Authorized Context="admins">
+                                        <RadzenMenuItem Click=@(() => NavTo("/admins")) Text="Admins" Icon="admin_panel_settings" />
+                                    </Authorized>
+                                </AuthorizeView>
+                                <RadzenMenuItem Click=@(() => NavTo("/signout")) Text="Sign Out" Icon="logout" />
+                            </RadzenMenuItem>
+                        </RadzenMenu>
+                    </div>
+                </Authorized>
+            </AuthorizeView>
+        </RadzenStack>
+    </div>
+    </RadzenHeader>
+
+    <main class="mt-5">
+        @Body
+    </main>
+}
+else
+{
+    <RadzenLayout style="position: relative;grid-template-areas: 'rz-sidebar rz-header' 'rz-sidebar rz-body'">
+        <RadzenHeader>
+            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0">
+                <RadzenSidebarToggle Click="@(() => sidebarExpanded = !sidebarExpanded)" />
+                <RadzenLabel Text="MyApp" />
+            </RadzenStack>
+        </RadzenHeader>
+        <RadzenSidebar Responsive="false" @bind-Expanded="@sidebarExpanded" style="position: absolute; z-index: 3">
+            <RadzenStack AlignItems="AlignItems.End" Class="rz-p-2">
+                <RadzenButton Icon="west" Variant="Variant.Text" ButtonStyle="ButtonStyle.Secondary" Click="@(() => sidebarExpanded = false)" />
+            </RadzenStack>
+            <RadzenPanelMenu>
+                <AuthorizeView>
+                    <NotAuthorized>
+                        <RadzenPanelMenuItem Click=@(() => NavTo("/signup")) Text="Sign Up" />
+                        <RadzenPanelMenuItem Click=@(() => NavTo("/signin")) Text="Sign In" />
+                    </NotAuthorized>
+                    <Authorized>
+                        <RadzenPanelMenuItem Click=@(() => NavTo("/myaccount")) Text="Account" Icon="account_circle" />
+                        <AuthorizeView Roles="Admin">
+                            <Authorized Context="admins">
+                                <RadzenPanelMenuItem Click=@(() => NavTo("/admins")) Text="Admins" Icon="admin_panel_settings" />
+                            </Authorized>
+                        </AuthorizeView>
+                        <RadzenPanelMenuItem Click=@(() => NavTo("/signout")) Text="Sign Out" Icon="logout" />
+                    </Authorized>
+                </AuthorizeView>
+            </RadzenPanelMenu>
+        </RadzenSidebar>
+        <RadzenBody>
+            <div class="rz-p-4">
+                @Body
+            </div>
+        </RadzenBody>
+        @if (sidebarExpanded)
+        {
+            <div @onclick="@(() => sidebarExpanded = false)" class="rz-dialog-mask" style="position: absolute; z-index: 2"></div>
+        }
+    </RadzenLayout>
+}
+
+@code {
+    bool _isMobileView { get; set; } = false;
+    bool sidebarExpanded { get; set; } = false;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            var width = await _js.InvokeAsync<int>("getScreenWidth");
+            if (width <= 600)
+            {
+                _isMobileView = true;
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+    }
+
+
+    void NavTo(string url)
+    {
+        if (sidebarExpanded)
+        {
+            sidebarExpanded = false;
+            StateHasChanged();
+        }
+
+        _navManager.NavigateTo(url);
+    }
+}

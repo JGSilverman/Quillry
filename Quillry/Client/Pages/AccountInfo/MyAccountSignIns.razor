@@ -1,0 +1,74 @@
+﻿@page "/myaccount/signins"
+
+@using System.Text.Json
+@using Quillry.Client.Helpers
+@using Quillry.Client.Services
+@using Quillry.Shared
+
+@attribute [Authorize]
+
+@inject IServiceScopeFactory _serviceScopeFactory
+@inject ILogger<MyAccountSignIns> _logger
+@inject NotificationService _notificationService
+@inject AuthenticationStateProvider _authStateProvider
+
+@if (_isLoading)
+{
+    <div>Loading...</div>
+}
+else
+{
+    @if (_userAccount is not null)
+    {
+        <div class="container">
+            <RadzenText TextStyle="TextStyle.H6" Text="Recent Activity" />
+            <UserLoginGrid UserId=@_userAccount.Id />
+        </div>
+    }
+}
+
+@code {
+    UserAccountDto _userAccount { get; set; }
+    bool _isLoading { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await base.OnInitializedAsync();
+        await GetDataAsync();
+    }
+
+    async Task GetDataAsync()
+    {
+        if (_isLoading) return;
+        try
+        {
+            _isLoading = true;
+            using var scope = _serviceScopeFactory.CreateAsyncScope();
+            HttpService httpService = scope.ServiceProvider.GetRequiredService<HttpService>();
+
+            ApiResponse apiResponse = await httpService.Get($"account");
+            if (apiResponse.Success)
+            {
+                _userAccount = JsonSerializer.Deserialize<UserAccountDto>(apiResponse.Data, new JsonSerializerOptions
+                    {
+                        PropertyNameCaseInsensitive = true
+                    });
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+        catch (Exception ex)
+        {
+            _notificationService.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Error,
+                    Detail = $"{ex.Message}"
+                });
+
+            _logger.LogError(ex.Message);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+}

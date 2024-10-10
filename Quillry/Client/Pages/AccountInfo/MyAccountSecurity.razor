@@ -1,0 +1,218 @@
+﻿@page "/myaccount/security"
+
+@using System.Text.Json
+@using Quillry.Client.Helpers
+@using Quillry.Client.Services
+@using Quillry.Shared
+
+@attribute [Authorize]
+
+@inject IServiceScopeFactory _serviceScopeFactory
+@inject ILogger<MyAccountSecurity> _logger
+@inject NotificationService _notificationService
+@inject AuthenticationStateProvider _authStateProvider
+
+@if (_isLoading)
+{
+    <div>Loading...</div>
+}
+else
+{
+    @if (_userAccount is not null)
+    {
+        <div class="container">
+            <RadzenText TextStyle="TextStyle.H6" Text="Security Info" />
+            <RadzenText TextStyle="TextStyle.Subtitle1"
+                    Text="These are the methods you use to sign into your account" />
+
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <RadzenIcon Icon="password" />
+                    <span>Password</span>
+                </div>
+                <div>Last updated: @_userAccount.PasswordLastChanged</div>
+                <RadzenButton Click=@(() => ToggleChangePasswordModal(true)) Text="Change" ButtonStyle="ButtonStyle.Light" />
+            </div>
+        </div>
+    }
+}
+
+<BSModal DataId="changePWModal" IsCentered="true" @ref=@_pwModalRef>
+    <Header>Change your password</Header>
+    <Content>
+        <EditForm Model=@_changePasswordModel OnValidSubmit=@HandleChangePassword Context="form">
+            <DataAnnotationsValidator />
+            <ValidationSummary />
+            <RadzenPassword class="w-100 mt-2" Placeholder="Current Password" @bind-Value=@_changePasswordModel.CurrentPassword />
+            <RadzenPassword class="w-100 mt-2" Placeholder="New Password" @bind-Value=@_changePasswordModel.NewPassword />
+            @if (_passwordErrors.Any())
+            {
+                foreach (var err in _passwordErrors)
+                {
+                    <div class="text-danger my-1">@err.Message</div>
+                }
+            }
+            <RadzenPassword class="w-100 mt-2" Placeholder="Confirm Password" @bind-Value=@_changePasswordModel.ConfirmPassword />
+        </EditForm>
+    </Content>
+    <Footer Context="modal">
+        <BSButton MarginStart="Margins.Auto" Color="BSColor.Secondary" @onclick=@(() => ToggleChangePasswordModal(false))>Close</BSButton>
+        <BSButton   OnClick=@HandleChangePassword 
+                    Color="BSColor.Primary" 
+                    IsDisabled=@(!_changePasswordModel.PasswordsMatch)>
+            Save changes
+        </BSButton>
+    </Footer>
+</BSModal>
+
+@code {
+    UserAccountDto _userAccount { get; set; }
+    bool _isLoading { get; set; }
+    BSModal _pwModalRef;
+    ChangePasswordDto _changePasswordModel { get; set; } = new();
+    List<FormError> _passwordErrors { get; set; } = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await base.OnInitializedAsync();
+        await GetDataAsync();
+    }
+
+    async Task GetDataAsync()
+    {
+        if (_isLoading) return;
+        try
+        {
+            _isLoading = true;
+            using var scope = _serviceScopeFactory.CreateAsyncScope();
+            HttpService httpService = scope.ServiceProvider.GetRequiredService<HttpService>();
+
+            ApiResponse apiResponse = await httpService.Get($"account");
+            if (apiResponse.Success)
+            {
+                _userAccount = JsonSerializer.Deserialize<UserAccountDto>(apiResponse.Data, new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                });
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+        catch (Exception ex)
+        {
+            _notificationService.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Error,
+                    Detail = $"{ex.Message}"
+                });
+
+            _logger.LogError(ex.Message);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    async Task ToggleChangePasswordModal(bool show)
+    {
+        _passwordErrors.Clear();
+
+        if (show) 
+        {
+            _changePasswordModel = new ChangePasswordDto();
+            await _pwModalRef?.ShowAsync();
+        }
+        else
+        {
+            await _pwModalRef?.HideAsync();
+            _changePasswordModel = null;
+        }
+    }
+
+    async Task HandleChangePassword()
+    {
+        try
+        {
+            _passwordErrors.Clear();
+
+            ValidatePassword();
+            if (_passwordErrors.Any()) return;
+
+            if (_changePasswordModel is not null && 
+                !string.IsNullOrEmpty(_changePasswordModel.CurrentPassword) &&
+                !string.IsNullOrEmpty(_changePasswordModel.NewPassword) &&
+                !string.IsNullOrEmpty(_changePasswordModel.ConfirmPassword))
+            {
+                if (!_changePasswordModel.PasswordsMatch) return;
+
+                using var scope = _serviceScopeFactory.CreateAsyncScope();
+                HttpService httpService = scope.ServiceProvider.GetRequiredService<HttpService>();
+
+                ApiResponse apiResponse = await httpService.Create($"account/changepassword", _changePasswordModel);
+
+                if (apiResponse.Success)
+                {
+                    _notificationService.Notify(new NotificationMessage
+                    {
+                        Severity = NotificationSeverity.Success,
+                        Detail = $"Successfully updated password!"
+                    });
+
+                    await ToggleChangePasswordModal(false);
+                    await GetDataAsync();
+                }
+                else
+                {
+                    _notificationService.Notify(new NotificationMessage
+                    {
+                        Severity = NotificationSeverity.Error,
+                        Detail = $"Unable to update password!"
+                    });
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _notificationService.Notify(new NotificationMessage
+            {
+                Severity = NotificationSeverity.Error,
+                Detail = $"{ex.Message}"
+            });
+
+            _logger.LogError(ex.Message);
+        }
+    }
+
+    void ValidatePassword()
+    {
+        char[] SpecialChars = "!@#$%^&*()".ToCharArray();
+
+        if (!_changePasswordModel.NewPassword.Any(char.IsDigit))
+        {
+            _passwordErrors.Add(new FormError
+            {
+                Key = "Password",
+                Message = "Password needs at least one number."
+            });
+        }
+
+        if (!_changePasswordModel.NewPassword.Any(char.IsUpper))
+        {
+            _passwordErrors.Add(new FormError
+            {
+                Key = "Password",
+                Message = "Password needs at least one uppercase letter."
+            });
+        }
+
+        int indexOf = _changePasswordModel.NewPassword.IndexOfAny(SpecialChars);
+        if (indexOf == -1)
+        {
+            _passwordErrors.Add(new FormError
+            {
+                Key = "Password",
+                Message = "Password needs at least one special character."
+            });
+        }
+    }
+}

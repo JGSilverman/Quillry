@@ -1,0 +1,31 @@
+﻿<Project Sdk="Microsoft.NET.Sdk.BlazorWebAssembly">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <ServiceWorkerAssetsManifest>service-worker-assets.js</ServiceWorkerAssetsManifest>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" Version="8.0.10" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="8.0.10" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.Extensions.Http" Version="8.0.1" />
+	<PackageReference Include="Blazored.LocalStorage" Version="4.5.0" />
+	<PackageReference Include="Humanizer.Core" Version="2.14.1" />
+	<PackageReference Include="Microsoft.AspNetCore.Components.Authorization" Version="8.0.10" />
+	<PackageReference Include="Radzen.Blazor" Version="5.2.12" />
+	<PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.1.2" />
+	  <PackageReference Include="BlazorStrap" Version="5.2.100.61524" />
+	  <PackageReference Include="BlazorStrap.V5" Version="5.2.100" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Shared\Quillry.Shared.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ServiceWorker Include="wwwroot\service-worker.js" PublishedContent="wwwroot\service-worker.published.js" />
+  </ItemGroup>
+
+</Project>

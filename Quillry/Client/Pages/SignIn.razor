@@ -1,0 +1,99 @@
+﻿@page "/signin"
+
+@using System.Text
+@using System.Text.Json
+@using Quillry.Client.Services
+
+@inject IServiceScopeFactory _serviceScopeFactory
+@inject NavigationManager _navigationManager
+@inject AuthStateProvider _authStateProvider
+@inject IJSRuntime _jsRuntime
+
+<div class="container-fluid row mt-5">
+    <div class="col-lg-6 offset-lg-3 col-sm-12">
+        <RadzenCard>
+            <RadzenText TextStyle=TextStyle.H6 Text="Sign In" />
+            <EditForm Model="@_userForAuthentication" OnValidSubmit="@HandleOnValidSubmit">
+                <DataAnnotationsValidator />
+                <RadzenTextBox class="w-100" Placeholder="Email" @bind-Value="@(_userForAuthentication.Email)" />
+                <ValidationMessage For="@(() => _userForAuthentication.Email)" />
+
+                <RadzenPassword class="w-100 mt-3" Placeholder="Password" @bind-Value="@(_userForAuthentication.Password)" />
+                <ValidationMessage For="@(() => _userForAuthentication.Password)" />
+
+                <RadzenButton class="mt-4"
+                              ButtonStyle="ButtonStyle.Primary"
+                              ButtonType="Radzen.ButtonType.Submit"
+                              Text="Sign In"
+                              IsBusy=@_btnIsBusy
+                              Disabled=@(string.IsNullOrEmpty(_userForAuthentication.Email) || string.IsNullOrEmpty(_userForAuthentication.Password)) />
+                @if (_showServerError && !string.IsNullOrEmpty(_serverErrorMessage))
+                {
+                    <div class="text-danger">@_serverErrorMessage</div>
+                }
+            </EditForm>
+        </RadzenCard>
+    </div>
+</div>
+
+<div class="d-flex justify-content-center mt-2">
+    <a href="/resendemailconfirmation" class="d-block">Resend Email confirmation</a>
+</div>
+<div class="d-flex justify-content-center mt-2">
+    <a href="/forgotpassword" class="mt-2 d-block">Forgot Password</a>
+</div>
+
+@code {
+    UserSignInDto _userForAuthentication = new UserSignInDto();
+    bool _showServerError { get; set; }
+    string? _serverErrorMessage { get; set; }
+    bool _btnIsBusy { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await base.OnInitializedAsync();
+    }
+
+    public async Task HandleOnValidSubmit()
+    {
+        _showServerError = false;
+        _serverErrorMessage = null;
+
+        try
+        {
+            _btnIsBusy = true;
+            var result = await _authStateProvider.SignIn(_userForAuthentication);
+            if (result.IsAuthSuccessful)
+            {
+                using var scope = _serviceScopeFactory.CreateScope();
+                HttpService httpService = scope.ServiceProvider.GetRequiredService<HttpService>();
+
+                var userAgent = await _jsRuntime.InvokeAsync<string>("getUserAgent");
+
+                if (!string.IsNullOrEmpty(userAgent))
+                {
+                    await httpService.Create(controller: "userlogins", new CreateUserLoginDto
+                    {
+                        UserAgentInfo = userAgent
+                    });
+                }
+
+                _navigationManager.NavigateTo("/");
+            }
+            else
+            {
+                _serverErrorMessage = result.ErrorMessage;
+                _showServerError = true;
+            }
+        }
+        catch (Exception ex)
+        {
+            _serverErrorMessage = ex.Message;
+            _showServerError = true;
+        }
+        finally
+        {
+            _btnIsBusy = false;
+        }
+    }
+}
