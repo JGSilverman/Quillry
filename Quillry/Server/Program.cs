@@ -7,6 +7,7 @@ using Microsoft.OpenApi.Models;
 using Quillry.Server.DataAccess;
 using Quillry.Server.Domain;
 using Quillry.Server.Helpers;
+using Quillry.Server.Services;
 using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -85,6 +86,7 @@ builder.Services.AddAutoMapper(typeof(MappingProfiles));
 builder.Services.AddScoped<UserRepo>();
 builder.Services.AddScoped<UserLoginRepo>();
 builder.Services.AddScoped<UserRolesRepo>();
+builder.Services.AddScoped<IEmailService, EmailService>();
 
 builder.Services.AddControllersWithViews();
 builder.Services.AddRazorPages();

@@ -8,6 +8,7 @@ using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
+using Quillry.Server.Services;
 
 namespace Quillry.Server.Controllers
 {
@@ -19,15 +20,18 @@ namespace Quillry.Server.Controllers
         readonly IConfiguration config;
         readonly UserManager<AppUser> userManager;
         readonly UserRepo userRepo;
+        readonly IEmailService emailService;
 
         public AuthController(
                 IConfiguration config,
                 UserManager<AppUser> userManager,
-                UserRepo userRepo)
+                UserRepo userRepo,
+                IEmailService emailService)
         {
             this.config = config;
             this.userManager = userManager;
             this.userRepo = userRepo;
+            this.emailService = emailService;
         }
 
         [HttpPost("signup")]
@@ -102,17 +106,17 @@ namespace Quillry.Server.Controllers
                     urlBuilder.Append($"userId={user.Id}&code={code}");
                     var callbackUrl = urlBuilder.ToString();
 
-                    //await this.emailService.SendEmailAsync(
-                    //    fromEmail: "noreply@quillry.com",
-                    //    toEmail: user.Email,
-                    //    subject: "Please confirm your e-mail address",
-                    //    message: $"Hey {user.DisplayName}. To get up and running on Quillry, you’ll just need to click <a class='btn btn-primary btn-lg' href='{callbackUrl}'>here</a> to confirm your email address.");
+                    await this.emailService.SendEmailAsync(
+                        fromEmail: "noreply@quillry.com",
+                        toEmail: user.Email,
+                        subject: "Please confirm your e-mail address",
+                        message: $"Hey {user.DisplayName}. To get up and running on Quillry, you’ll just need to click <a class='btn btn-primary btn-lg' href='{callbackUrl}'>here</a> to confirm your email address.");
 
-                    //await this.emailService.SendEmailAsync(
-                    //    fromEmail: "noreply@quillry.com",
-                    //    toEmail: "joshuagsilverman@gmail.com",
-                    //    subject: "New Quillry User Registered",
-                    //    message: $"{user.DisplayName} just signed up.");
+                    await this.emailService.SendEmailAsync(
+                        fromEmail: "noreply@quillry.com",
+                        toEmail: "joshuagsilverman@gmail.com",
+                        subject: "New Quillry User Registered",
+                        message: $"{user.DisplayName} just signed up.");
 
                     return Ok(new AuthResponseDto
                     {

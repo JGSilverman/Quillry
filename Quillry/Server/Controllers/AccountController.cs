@@ -2,10 +2,10 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
-using Quillry.Client.Helpers;
 using Quillry.Server.DataAccess;
 using Quillry.Server.Domain;
 using Quillry.Server.Extensions;
+using Quillry.Server.Services;
 using Quillry.Shared;
 
 namespace Quillry.Server.Controllers
@@ -20,19 +20,22 @@ namespace Quillry.Server.Controllers
         readonly UserRepo userRepo;
         readonly UserRolesRepo rolesRepo;
         readonly IMapper mapper;
+        readonly IEmailService emailService;
 
         public AccountController(
                 IConfiguration config,
                 UserManager<AppUser> userManager,
                 UserRepo userRepo,
                 UserRolesRepo rolesRepo,
-                IMapper mapper)
+                IMapper mapper,
+                IEmailService emailService)
         {
             this.config = config;
             this.userManager = userManager;
             this.userRepo = userRepo;
             this.rolesRepo = rolesRepo;
             this.mapper = mapper;
+            this.emailService = emailService;
         }
 
         [HttpGet]
@@ -90,8 +93,16 @@ namespace Quillry.Server.Controllers
                                         newPassword: dto.NewPassword);
 
                 if (!passwordChangedResult.Succeeded) return BadRequest("Unable to change password");
+
                 user.PasswordLastChanged = DateTime.Now;
                 await userRepo.UpdateOneAsync(user);
+
+                await this.emailService.SendEmailAsync(
+                       fromEmail: "noreply@quillry.com",
+                       toEmail: user.Email,
+                       subject: "Your password has changed!",
+                       message: $"Hey {user.DisplayName}. Your password was just changed. If you didn't take this action, please contact us immediately.");
+
                 return Ok();
             }
             catch (Exception ex)
